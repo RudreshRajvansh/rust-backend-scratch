@@ -1,28 +1,5 @@
 use libc;
 
-
-fn randw(aa : i32){
-    unsafe{
-    let mut buf = [0u8; 1024];
-    let mut rr = libc::read(aa, buf.as_mut_ptr() as *mut libc::c_void, 1024);
-    while rr>0 {
-        if rr > 0 {
-            println!("Read Bytes : {}",String::from_utf8_lossy(&buf[0..rr as usize]));
-                let ww = libc::write(aa,buf.as_ptr() as *mut libc::c_void,rr as usize);
-                if ww > 0 {
-                    println!("Bytes echoed : {}",ww);
-                }else{
-                    println!("Error on write, {}",std::io::Error::last_os_error());
-                    break;
-                }
-        }else{
-            println!("Error on read or empty read, {}",std::io::Error::last_os_error());
-            break;
-        }
-        rr = libc::read(aa, buf.as_mut_ptr() as *mut libc::c_void, 1024);
-}
-}
-}
 fn main() {
     unsafe{
         let fd = libc::socket(libc::AF_INET, libc::SOCK_STREAM,0);
@@ -68,23 +45,28 @@ fn main() {
                             cev.u64 = aa as u64; 
                             libc::epoll_ctl(ep,libc::EPOLL_CTL_ADD,aa, &mut cev);
                             println!("A client connected! {}",aa);
-                            }
+                            }else{
+                              let mut buf = [0u8; 1024];
+                              let mut rr = libc::read(events[i as usize].u64 as i32, buf.as_mut_ptr() as *mut libc::c_void, 1024);
+                              if rr > 0 {
+                                let ww = libc::write(events[i as usize].u64 as i32,buf.as_ptr() as *mut libc::c_void,rr as usize);
+                              if ww > 0 {
+                                println!("Bytes echoed : {}",ww);
+                              }else{
+                                println!("Error on write, {}",std::io::Error::last_os_error());
+                              }
+                              }
+                              else if rr == 0{
+                                libc::epoll_ctl(ep,libc::EPOLL_CTL_DEL,events[i as usize].u64 as i32,std::ptr::null_mut());
+                                libc::close(events[i as usize].u64 as i32);
+                              }
+                              else if rr<0 && std::io::Error::last_os_error().raw_os_error() != Some(libc::EWOULDBLOCK){
+                                println!("Error Occured in read");
+                              }
+                         
                         }
                     }
-                        // //now we use accept to accept connections
-                        // let mut aa = libc::accept(fd,std::ptr::null_mut(),std::ptr::null_mut());
-                        //    // while aa >= -1 && std::io::Error::last_os_error() == std::io::Error::from_raw_os_error(libc::EAGAIN) {
-                        //    loop{
-                        //     if aa == -1 && std::io::Error::last_os_error().raw_os_error() != Some(libc::EWOULDBLOCK ){
-                        //         println!("Accept error : {}",std::io::Error::last_os_error());
-                        //     } else if aa > 0 {
-                        //             println!("Connection accepted with fd: {}",aa);
-                        //             randw(aa);
-                        //             libc::close(aa);
-                        //             println!("Connection closed! Ready for next");
-                        //     }
-                        //     aa = libc::accept(fd,std::ptr::null_mut(),std::ptr::null_mut());
-                        // }
+                    }
                     }
                     else{
                             println!("Listen error : {}",std::io::Error::last_os_error()); 
